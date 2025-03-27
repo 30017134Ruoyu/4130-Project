@@ -5,6 +5,7 @@ import { planetData } from "./objects/data.js";
 import { getPlanetPosition, createOrbit, createSun, createPlanet, createGroup } from "./objects/utils.js";
 import { createBackground } from "./objects/background.js";
 import { Spaceship } from "./objects/spaceship.js";
+import { PlanetInfoSystem } from "./objects/planet-info.js";
 
 
 const scene = new THREE.Scene();
@@ -105,19 +106,23 @@ planetNames.forEach((name) => {
 // Spaceship (with separate camera and warp effect)
 const spaceship = new Spaceship(scene);
 
+background.initCameras(spaceship.getActiveCamera(), globalCamera);
+const planetInfoSystem = new PlanetInfoSystem(scene, planetGroups, planetData);
+
 
 // dat.gui 
 const gui = new dat.GUI();
 const cameraOptions = {
-  mode: "Spaceship", // "Spaceship" 或 "God View"
-  selectedPlanet: "none", // 选择聚焦的行星（"none" 表示不聚焦） // Select the planet to focus on ("none" means no focus)
+  mode: "God View", // "Spaceship" or "God View"
+  selectedPlanet: "none", // Select the planet to focus on ("none" means no focus)
   reset: () => { 
     globalCamera.position.set(0, 5000, 15000);
     controls.target.set(0, 0, 0);
   },
 };
+controls.enabled = true;
 
-// 切换摄像机模式 Switch camera mode
+// Switch camera mode
 gui.add(cameraOptions, "mode", ["Spaceship", "God View"]).name("Camera Mode").onChange((value) => {
   controls.enabled = (value === "God View");
 });
@@ -140,6 +145,15 @@ gui.add(cameraOptions, "selectedPlanet", planetList).name("Focus Planet").onChan
 
 // Reset God's Perspective
 gui.add(cameraOptions, "reset").name("Reset God View");
+const infoFolder = gui.addFolder("Planet Info demonstrate:");
+infoFolder.add({ showPlanetInfo: true }, 'showPlanetInfo')
+  .name("Display information while approaching a planet")
+  .onChange(value => {
+    if (!value && planetInfoSystem.infoCardState.isOpen) {
+      planetInfoSystem.hideInfoCard();
+    }
+    planetInfoSystem.proximityThreshold = value ? 10000 : 0;
+  });
 
 // -------------------------
 // label
@@ -176,7 +190,9 @@ planetNames.forEach((name) => {
 
 // Update planet label positions
 function updatePlanetLabels() {
-  const shipCam = spaceship.getActiveCamera();
+  
+  const currentCamera = cameraOptions.mode === "Spaceship" ? spaceship.getActiveCamera() : globalCamera;
+  
   planetNames.forEach((name) => {
     const label = document.querySelector(`.planet-label[data-name="${name}"]`);
     if (!label) return;
@@ -188,10 +204,12 @@ function updatePlanetLabels() {
     const labelHeight = planetRadius * labelOffsetFactor;
     const labelWorldPos = planetGroup.position.clone().add(new THREE.Vector3(0, labelHeight, 0));
 
-    const vector = labelWorldPos.clone().project(shipCam);
+    // Use the currently active camera for projection
+    const vector = labelWorldPos.clone().project(currentCamera);
     let x = (vector.x * 0.5 + 0.5) * window.innerWidth;
     let y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
     y -= 20;
+    
     if (vector.z < 0 || vector.z > 1) {
       label.style.display = "none";
     } else {
@@ -210,7 +228,11 @@ function animate() {
   const delta = (now - time) / 1000;
   time = now;
 
-  background.animate(delta);
+  background.animate(delta, cameraOptions.mode);
+  const currentCamera = cameraOptions.mode === "Spaceship" ? spaceship.getActiveCamera() : globalCamera;
+  planetInfoSystem.setActiveCamera(currentCamera);
+
+  planetInfoSystem.update();
 
   // Solar rotation
   sun.children[0].rotation.y += 0.0005;
@@ -242,24 +264,24 @@ function animate() {
     const heliocentricX = r * (Math.sin(longNode) * Math.cos(v + w) + Math.cos(longNode) * Math.sin(v + w) * Math.cos(I));
     planetGroups[name].position.set(heliocentricX, heliocentricY, heliocentricZ);
 
-    // 行星自转
+    // Planetary rotation
     const rotationSpeed = 2 * Math.PI / (planetData[name].day * 3600);
     planets[name].children[0].rotation.y += rotationSpeed * delta * 3600;
   });
 
-  // 更新飞船（含 Warp 效果）
+  // Updated spaceship (including Warp effect)
   spaceship.update(delta);
 
   // update label
   updatePlanetLabels();
 
-  // update OrbitControls（仅在上帝视角下启用）
+  // update OrbitControls（Only enabled in God view）
   controls.enabled = (cameraOptions.mode === "God View");
   if (controls.enabled) {
     controls.update();
   }
 
-  // 根据模式选择使用哪个摄像机渲染 Select which camera to use for rendering based on the mode
+  // Select which camera to use for rendering based on the mode
   if (cameraOptions.mode === "Spaceship") {
     renderer.render(scene, spaceship.getActiveCamera());
   } else {
@@ -272,4 +294,7 @@ animate();
 window.addEventListener("beforeunload", () => {
   background.cleanup && background.cleanup();
   spaceship.dispose();
+  planetInfoSystem.dispose(); 
 });
+
+

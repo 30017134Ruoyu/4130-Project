@@ -1,143 +1,174 @@
-// warp.js
 import * as THREE from "three";
 
-class WarpEffectSystem {
-    constructor(scene, count = 1000) { // 增加线条数
+class CameraWarpEffect {
+    constructor(scene, camera, options = {}) {
         this.scene = scene;
-        this.particleCount = count;
+        this.camera = camera;
         this.active = false;
-
-        this.linesGroup = new THREE.Group();
-        scene.add(this.linesGroup);
-
+        
+        this.options = {
+            lineCount: options.lineCount || 1000,       
+            minLength: options.minLength || 800,      
+            maxLength: options.maxLength || 3000,      
+            minWidth: options.minWidth || 2,           
+            maxWidth: options.maxWidth || 4,           
+            color: options.color || 0xffffff,         
+            speedFactor: options.speedFactor || 1.0,   
+            spawnRadius: options.spawnRadius || 1.5    
+        };
+        
+        // line group
+        this.warpGroup = new THREE.Group();
+        this.scene.add(this.warpGroup);
         this.lines = [];
         this.init();
     }
-
+    
     init() {
-        while (this.linesGroup.children.length > 0) {
-            this.linesGroup.remove(this.linesGroup.children[0]);
+        while (this.warpGroup.children.length > 0) {
+            const obj = this.warpGroup.children[0];
+            this.warpGroup.remove(obj);
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
         }
         this.lines = [];
-
+        
         const material = new THREE.LineBasicMaterial({
-            color: 0x88ccff,
+            color: this.options.color,
             transparent: true,
             opacity: 0.7,
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-
-        for (let i = 0; i < this.particleCount; i++) {
+        
+        // Creating Line Geometry
+        for (let i = 0; i < this.options.lineCount; i++) {
+            // Create a geometry for each line
             const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(6);
+            // Each line has two points: the start point and the end point
+            const positions = new Float32Array(6); 
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
+            
+            // Create a line and add it to a group
             const line = new THREE.Line(geometry, material.clone());
-            line.visible = false;
-            this.linesGroup.add(line);
-
+            line.frustumCulled = false; 
+            line.visible = false; 
+            this.warpGroup.add(line);
+            
+            // sotre lines
             this.lines.push({
-                line,
-                length: 300 + Math.random() * 300,
-                offset: new THREE.Vector3()
+                line: line,
+                length: this.options.minLength + Math.random() * (this.options.maxLength - this.options.minLength),
+                speed: 1.0 + Math.random() * 2.0,
+                position: new THREE.Vector3(),
+                direction: new THREE.Vector3(0, 0, -1),
+                distance: 0,
+                opacity: 0.4 + Math.random() * 0.6
             });
         }
     }
-
-    activate(shipPosition, shipDirection) {
+    
+    // Activate warp effect
+    activate() {
         if (this.active) return;
         this.active = true;
-        this.resetLines(shipPosition, shipDirection);
-        this.lines.forEach(info => info.line.visible = true);
-        console.log("Warp effect ACTIVATED");
+        
+        // Reset All Lines
+        this.resetAllLines();
+        
+        // Show All Lines
+        this.lines.forEach(info => {
+            info.line.visible = true;
+            // Set different transparency levels for different lines
+            info.line.material.opacity = info.opacity;
+        });
     }
-
+    
+    // Deactivaate warp effect
     deactivate() {
         if (!this.active) return;
         this.active = false;
-        this.lines.forEach(info => info.line.visible = false);
-        console.log("Warp effect DEACTIVATED");
-    }
-
-    resetLines(shipPos, shipDir) {
-        const forward = shipDir.clone().normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(forward, up).normalize();
-
-        if (Math.abs(forward.dot(up)) > 0.9) {
-            up.set(1, 0, 0);
-            right.crossVectors(forward, up).normalize();
-        }
-        up.crossVectors(right, forward).normalize();
-
         this.lines.forEach(info => {
-            const radius = Math.random() * 1000;
-            const angle = Math.random() * Math.PI * 2;
-            const x = radius * Math.cos(angle);
-            const y = radius * Math.sin(angle);
-            const z = -2000 - Math.random() * 2000;
-
-            info.offset.set(x, y, z);
-
-            const pos = shipPos.clone()
-                .addScaledVector(right, x)
-                .addScaledVector(up, y)
-                .addScaledVector(forward, z);
-
-            this.updateLinePosition(info, pos, forward);
+            info.line.visible = false;
         });
     }
-
-    updateLinePosition(info, basePos, forward) {
-        const posAttr = info.line.geometry.getAttribute("position");
-        posAttr.setXYZ(0, basePos.x, basePos.y, basePos.z);
-        const end = basePos.clone().addScaledVector(forward, info.length);
-        posAttr.setXYZ(1, end.x, end.y, end.z);
+    resetAllLines() {
+        for (let i = 0; i < this.lines.length; i++) {
+            this.resetLine(this.lines[i]);
+        }
+    }
+    resetLine(lineInfo) {
+        // Generate a random point based on the camera frustum
+        const theta = Math.random() * Math.PI * 2;
+        
+        // 在2D平面上的随机位置 (视野平面)
+        const r = this.options.spawnRadius * Math.sqrt(Math.random());
+        const x = r * Math.cos(theta);
+        const y = r * Math.sin(theta);
+        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+        const startDist = 500 + Math.random() * 2000; 
+        const startPoint = this.camera.position.clone()
+            .add(direction.clone().multiplyScalar(startDist))
+            .add(right.clone().multiplyScalar(x * startDist))
+            .add(up.clone().multiplyScalar(y * startDist));
+        
+        // Line direction (towards the camera but slightly offset)
+        const directionToCamera = this.camera.position.clone().sub(startPoint).normalize();
+        lineInfo.position.copy(startPoint);
+        lineInfo.direction.copy(directionToCamera);
+        lineInfo.distance = 0;
+        this.updateLineGeometry(lineInfo);
+    }
+    updateLineGeometry(lineInfo) {
+        const posAttr = lineInfo.line.geometry.getAttribute("position");
+        posAttr.setXYZ(0, lineInfo.position.x, lineInfo.position.y, lineInfo.position.z);
+        const endPoint = lineInfo.position.clone().add(
+            lineInfo.direction.clone().multiplyScalar(lineInfo.length)
+        );
+        posAttr.setXYZ(1, endPoint.x, endPoint.y, endPoint.z);
         posAttr.needsUpdate = true;
     }
-
-    update(delta, shipPos, shipDir, isActive) {
+    
+    // update warp 
+    update(delta, isActive) {
         if (isActive !== this.active) {
-            isActive ? this.activate(shipPos, shipDir) : this.deactivate();
+            isActive ? this.activate() : this.deactivate();
         }
         if (!this.active) return;
-
-        const forward = shipDir.clone().normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(forward, up).normalize();
-
-        if (Math.abs(forward.dot(up)) > 0.9) {
-            up.set(1, 0, 0);
-            right.crossVectors(forward, up).normalize();
-        }
-        up.crossVectors(right, forward).normalize();
-
-        this.lines.forEach(info => {
-            info.offset.z += 2500 * delta; // 线条接近飞船
-
-            if (info.offset.z > 0) {
-                info.offset.z = -2000 - Math.random() * 2000;
-                info.offset.x = (Math.random() - 0.5) * 2000;
-                info.offset.y = (Math.random() - 0.5) * 2000;
+        
+        //update all lines
+        for (let i = 0; i < this.lines.length; i++) {
+            const info = this.lines[i];
+            const moveDistance = info.speed * 10000 * delta * this.options.speedFactor;
+            info.position.add(info.direction.clone().multiplyScalar(moveDistance));
+            info.distance += moveDistance;
+            
+            // If the line moves closer to the camera or beyond a certain distance, reset
+            const distToCamera = info.position.distanceTo(this.camera.position);
+            if (distToCamera < 100 || info.distance > 10000) {
+                this.resetLine(info);
+            } else {
+                this.updateLineGeometry(info);
             }
-
-            const pos = shipPos.clone()
-                .addScaledVector(right, info.offset.x)
-                .addScaledVector(up, info.offset.y)
-                .addScaledVector(forward, info.offset.z);
-
-            this.updateLinePosition(info, pos, forward);
-        });
+        }
     }
-
+    
     dispose() {
-        this.scene.remove(this.linesGroup);
+        this.scene.remove(this.warpGroup);
+        
         this.lines.forEach(info => {
-            info.line.geometry.dispose();
-            info.line.material.dispose();
+            if (info.line.geometry) {
+                info.line.geometry.dispose();
+            }
+            if (info.line.material) {
+                info.line.material.dispose();
+            }
         });
+        
+        this.lines = [];
     }
 }
 
-export { WarpEffectSystem };
+export { CameraWarpEffect };

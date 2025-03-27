@@ -1,9 +1,11 @@
 import * as THREE from "three";
+import { MeteorSystem } from './meteor.js';
+import { CameraWarpEffect } from './warp.js';
 
-// 纹理加载器 Texture Loader
+// Texture Loader
 const textureLoader = new THREE.TextureLoader();
 
-// 创建更明显的小星星（背景星空）Create more visible small stars (background stars)
+// Create more visible small stars (background stars)
 function createStars(count = 3000, radius = 200000) {
     const starsGroup = new THREE.Group();
      
@@ -15,15 +17,15 @@ function createStars(count = 3000, radius = 200000) {
 
     }
     
-    // 创建一组闪烁星星的精灵 Create a set of twinkling star sprites
+    // Create a set of twinkling star sprites
     const stars = [];
     for (let i = 0; i < count; i++) {
-        // 随机位置，星星分布在范围内 Random position, stars are distributed within the range
+        //  Random position, stars are distributed within the range
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
          
-        // 调整分布，让星星分布在更明显的距离  Adjust the distribution so that the stars are at a more obvious distance
-        const r = radius * (0.5 + 0.5 * Math.random()); // 星星分布在50%-100%的半径范围，更明显 The stars are distributed in the 50%-100% radius range and are more obvious.
+        // Adjust the distribution so that the stars are at a more obvious distance
+        const r = radius * (0.5 + 0.5 * Math.random()); // The stars are distributed in the 50%-100% radius range and are more obvious.
         
         const position = new THREE.Vector3(
             r * Math.sin(phi) * Math.cos(theta),
@@ -31,35 +33,35 @@ function createStars(count = 3000, radius = 200000) {
             r * Math.cos(phi)
         );
         
-        // 星星颜色 - 更明亮
+        // star color - much more bright 
         const colorRand = Math.random();
         const color = new THREE.Color();
         
         if (colorRand > 0.95) {
-            color.setHSL(0.05, 0.9, 1.0); // 明亮红色  red
+            color.setHSL(0.05, 0.9, 1.0); // red
         } else if (colorRand > 0.9) {
-            color.setHSL(0.15, 0.8, 1.0); // 明亮黄色 yellow
+            color.setHSL(0.15, 0.8, 1.0); // yellow
         } else if (colorRand > 0.85) {
-            color.setHSL(0.6, 0.7, 1.0);  // 明亮蓝色 blue
+            color.setHSL(0.6, 0.7, 1.0);  // blue
         } else {
-            color.setHSL(0.0, 0.0, 1.0);  // 纯白色 white
+            color.setHSL(0.0, 0.0, 1.0);  // white
         }
         
-        // 创建精灵材质 - 提高亮度和不透明度 Creating a Sprite Material - Increasing Brightness and Opacity
+        // Creating a Sprite Material - Increasing Brightness and Opacity
         const spriteMaterial = new THREE.SpriteMaterial({
             map: starTexture,
             color: color,
             transparent: true,
-            opacity: 0.5 + Math.random() * 0.5, // 较高的不透明度，0.5-1.0 Higher opacity, 0.5-1.0
+            opacity: 0.5 + Math.random() * 0.5, // Higher opacity, 0.5-1.0
             blending: THREE.AdditiveBlending
         });
         
-        // 创建精灵 Creating a sprite
+        // Creating a sprite
         const sprite = new THREE.Sprite(spriteMaterial);
         sprite.position.copy(position);
         
-        // 使用小尺寸星星，但确保可见 Use small stars, but make sure they are visible
-        const size = 200 + Math.random() * 200; // 小尺寸的星星，但比之前大一些，200-400 Smaller stars, but bigger than before, 200-400
+        // Use small stars, but make sure they are visible
+        const size = 200 + Math.random() * 200; // Smaller stars, but bigger than before, 200-400
         
         sprite.scale.set(size, size, 1);
         starsGroup.add(sprite);
@@ -74,7 +76,7 @@ function createStars(count = 3000, radius = 200000) {
         });
     }
     
-    // 启动独立计时器更新闪烁 Start independent timer to update flash
+    // Start independent timer to update flash
     const twinkleInterval = setInterval(() => {
         const time = Date.now() / 1000; 
         
@@ -93,7 +95,7 @@ function createStars(count = 3000, radius = 200000) {
     };
 }
 
-// 创建背景天空盒 Creating a Background Skybox
+// Creating a Background Skybox
 function createSkybox() {
     const geometry = new THREE.SphereGeometry(500000, 32, 32);
     let texture;
@@ -104,7 +106,6 @@ function createSkybox() {
        
     }
     
-
     const material = new THREE.MeshBasicMaterial({
         map: texture,
         side: THREE.BackSide,  
@@ -122,9 +123,94 @@ function createBackground(scene) {
     const stars = createStars(3000, 200000);
     scene.add(stars.starsGroup);
     
+    // meteor system
+    const meteorSystem = new MeteorSystem(scene, {
+        count: 20,              
+        maxDistance: 200000,    
+        minSpeed: 2000,        
+        maxSpeed: 8000,      
+        minSize: 100,           
+        maxSize: 300,          
+        color: 0xFFFFFF,        
+        trailLength: 15,        
+        frequency: 0.03        
+    });
+    
+    // camera storage
+    let cameraWarpEffect = null;
+    let shipCamera = null;
+    let godCamera = null;
+    
+    // press shift to activate warp
+    let isShiftPressed = false;
+    
+    // keyborad bind
+    const onKeyDown = (e) => {
+        if (e.code === "ShiftLeft") {
+            isShiftPressed = true;
+        }
+    };
+    
+    const onKeyUp = (e) => {
+        if (e.code === "ShiftLeft") {
+            isShiftPressed = false;
+        }
+    };
+    
+    // add keyboard listener
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+    
     return {
-        animate: () => {},
-        cleanup: stars.cleanup
+        // init
+        initCameras: (spaceshipCamera, globalCameraRef) => {
+            shipCamera = spaceshipCamera;
+            godCamera = globalCameraRef;
+            
+            // create warp scene
+            cameraWarpEffect = new CameraWarpEffect(scene, shipCamera, {
+                lineCount: 1000,       
+                color: 0x88ccff,      
+                speedFactor: 1.0,     
+                spawnRadius: 1.8      
+            });
+        },
+        
+        
+        animate: (delta, currentCameraMode) => {
+            if (meteorSystem) {
+                meteorSystem.update(delta);
+            }
+            // only on spaceship view
+            if (cameraWarpEffect && currentCameraMode === "Spaceship") {
+                const activeCamera = currentCameraMode === "Spaceship" ? shipCamera : godCamera;
+                if (activeCamera) {
+                    cameraWarpEffect.camera = activeCamera;
+                    cameraWarpEffect.update(delta, isShiftPressed);
+                }
+            }
+        },
+        
+        // clean
+        cleanup: () => {
+            stars.cleanup();
+            
+            if (meteorSystem) {
+                meteorSystem.dispose();
+            }
+            
+            if (cameraWarpEffect) {
+                cameraWarpEffect.dispose();
+            }
+            
+            // remove eventlistener
+            document.removeEventListener("keydown", onKeyDown);
+            document.removeEventListener("keyup", onKeyUp);
+        },
+        
+        // export
+        meteorSystem,
+        getWarpEffect: () => cameraWarpEffect
     };
 }
 

@@ -432,30 +432,6 @@ const createNeptune = (radius) => {
     return neptuneGroup;
 };
 
-// Create the moon
-const createMoon = (radius) => {
-    const textureLoader = new THREE.TextureLoader();
-    const texture = textureLoader.load(`/assets/moonmap1k.jpg`);
-    const bumpMap = textureLoader.load(`/assets/moonbump1k.jpg`);
-    
-    texture.colorSpace = THREE.SRGBColorSpace;
-    bumpMap.colorSpace = THREE.SRGBColorSpace;
-    
-    const geometry = new THREE.SphereGeometry(radius, 32, 32);
-    const material = new THREE.MeshStandardMaterial({ 
-        map: texture,
-        bumpMap: bumpMap,
-        bumpScale: 0.005,
-        roughness: 0.8
-    });
-    
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = 'moon';
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    
-    return mesh;
-};
 
 // Create the universe background
 const createUniverse = (name, radius) => {
@@ -516,8 +492,6 @@ const createPlanet = (name, radius) => {
         return planetCreators[name](radius);
     }
     
-    console.warn(`行星 ${name} 没有对应的创建函数，使用通用创建方法`);
-    
     //Default general creation method
     const textureLoader = new THREE.TextureLoader();
     const texture = textureLoader.load(`/assets/${name}.jpg`);
@@ -544,13 +518,11 @@ const createGroup = (body) => {
     return group;
 };
 
-// 导出所有工具函数
 export { 
     getPlanetPosition, 
     createOrbit, 
     createSun, 
     createPlanet,
-    createMoon,
     createUniverse, 
     createGroup 
 };
