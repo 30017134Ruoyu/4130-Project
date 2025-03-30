@@ -115,11 +115,13 @@ const gui = new dat.GUI();
 const cameraOptions = {
   mode: "God View", // "Spaceship" or "God View"
   selectedPlanet: "none", // Select the planet to focus on ("none" means no focus)
+  showOrbits: true,
   reset: () => { 
     globalCamera.position.set(0, 5000, 15000);
     controls.target.set(0, 0, 0);
   },
 };
+
 controls.enabled = true;
 
 // Switch camera mode
@@ -127,12 +129,22 @@ gui.add(cameraOptions, "mode", ["Spaceship", "God View"]).name("Camera Mode").on
   controls.enabled = (value === "God View");
 });
 
-// 行星选择列表（添加 "none" 选项）Planet selection list (added "none" option)
+gui.add(cameraOptions, "showOrbits").name("Show Orbits").onChange((value) => {
+  planetNames.forEach((name) => {
+    orbits[name].visible = value;
+  });
+});
+
+planetNames.forEach((name) => {
+  orbits[name].visible = cameraOptions.showOrbits;
+});
+
+// Planet selection list (added "none" option)
 const planetList = ["none", ...planetNames];
 gui.add(cameraOptions, "selectedPlanet", planetList).name("Focus Planet").onChange((value) => {
   if (value !== "none") {
     const pos = planetGroups[value].position.clone();
-    // 根据行星位置计算一个偏移量（可根据需求调整）Calculate an offset based on the planetary position (adjustable as needed)
+    // Calculate an offset based on the planetary position (adjustable as needed)
     const offset = new THREE.Vector3(
       pos.x > 0 ? -2000 : 2000,
       1000,
@@ -155,7 +167,6 @@ infoFolder.add({ showPlanetInfo: true }, 'showPlanetInfo')
     planetInfoSystem.proximityThreshold = value ? 10000 : 0;
   });
 
-// -------------------------
 // label
 planetNames.forEach((name) => {
   const label = document.createElement("div");
