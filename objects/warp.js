@@ -101,7 +101,7 @@ class CameraWarpEffect {
         // Generate a random point based on the camera frustum
         const theta = Math.random() * Math.PI * 2;
         
-        // 在2D平面上的随机位置 (视野平面)
+        
         const r = this.options.spawnRadius * Math.sqrt(Math.random());
         const x = r * Math.cos(theta);
         const y = r * Math.sin(theta);
