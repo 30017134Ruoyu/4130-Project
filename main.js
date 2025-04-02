@@ -232,73 +232,53 @@ function updatePlanetLabels() {
 }
 
 
+let simulationTime = Date.now(); 
+
+
 function animate() {
   requestAnimationFrame(animate);
 
   const now = Date.now();
-  const delta = (now - time) / 1000;
+  const delta = (now - time) / 1000; 
   time = now;
+  
+  
+  simulationTime += delta * 1000 * orbitSpeedFactor; 
 
   background.animate(delta, cameraOptions.mode);
-  const currentCamera = cameraOptions.mode === "Spaceship" ? spaceship.getActiveCamera() : globalCamera;
+  const currentCamera = cameraOptions.mode === "Spaceship" ? 
+    spaceship.getActiveCamera() : globalCamera;
   planetInfoSystem.setActiveCamera(currentCamera);
 
   planetInfoSystem.update();
 
-  // Solar rotation
+  // sun and planet rotation
   sun.children[0].rotation.y += 0.0005;
 
-  // Planetary revolution and rotation
   planetNames.forEach((name) => {
-    const angularSpeed = (2 * Math.PI / (orbitPeriods[name] * 24 * 3600)) * delta * orbitSpeedFactor;
-    orbitAngles[name] += angularSpeed;
-    const data = planetData[name];
-    const a = data.a[0] * planetData.common.AU;
-    const e = data.e[0];
-    const I = THREE.MathUtils.degToRad(data.I[0]);
-    const longNode = THREE.MathUtils.degToRad(data.longNode[0]);
-    const longPeri = THREE.MathUtils.degToRad(data.longPeri[0]);
-    const w = longPeri - longNode;
-    const M = orbitAngles[name] % (2 * Math.PI);
-
-    let E = M;
-    for (let i = 0; i < 10; i++) {
-      E = M + e * Math.sin(E);
-    }
-
-    const x = a * (Math.cos(E) - e);
-    const y = a * Math.sqrt(1 - e * e) * Math.sin(E);
-    const r = Math.sqrt(x * x + y * y);
-    const v = Math.atan2(y, x);
-    const heliocentricZ = r * (Math.cos(longNode) * Math.cos(v + w) - Math.sin(longNode) * Math.sin(v + w) * Math.cos(I));
-    const heliocentricY = r * (Math.sin(v + w) * Math.sin(I));
-    const heliocentricX = r * (Math.sin(longNode) * Math.cos(v + w) + Math.cos(longNode) * Math.sin(v + w) * Math.cos(I));
-    planetGroups[name].position.set(heliocentricX, heliocentricY, heliocentricZ);
-
-    // Planetary rotation
+    // Calculate position using getPlanetPosition and simulation time
+    const position = getPlanetPosition(name, simulationTime);
+    planetGroups[name].position.copy(position);
+    
     const rotationSpeed = 2 * Math.PI / (planetData[name].day * 3600);
     planets[name].children[0].rotation.y += rotationSpeed * delta * 3600;
   });
 
-  // Updated spaceship (including Warp effect)
+  
   spaceship.update(delta);
-
-  // update label
   updatePlanetLabels();
 
-  // update OrbitControls（Only enabled in God view）
   controls.enabled = (cameraOptions.mode === "God View");
   if (controls.enabled) {
     controls.update();
   }
-
-  // Select which camera to use for rendering based on the mode
   if (cameraOptions.mode === "Spaceship") {
     renderer.render(scene, spaceship.getActiveCamera());
   } else {
     renderer.render(scene, globalCamera);
   }
 }
+
 
 animate();
 
