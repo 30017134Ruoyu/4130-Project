@@ -2,12 +2,11 @@ import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
 
-
 class Spaceship {
   constructor(scene) {
     this.scene = scene;
 
-    // Create ship Camera
+    // Camera
     this.shipCamera = new THREE.PerspectiveCamera(
       60,
       window.innerWidth / window.innerHeight,
@@ -15,55 +14,51 @@ class Spaceship {
       10000000
     );
 
-    // spaceship group
+    // Group
     this.shipGroup = new THREE.Group();
     this.scene.add(this.shipGroup);
 
-    // Keyboard control status
-    this.controls = {
-      moveForward: false,
-      moveBackward: false,
-      moveLeft: false,
-      moveRight: false,
-      moveUp: false,
-      moveDown: false,
-      rotateUp: false,    // I
-      rotateDown: false,  // K
-      rotateLeft: false,  // J
-      rotateRight: false, // L
-    };
+    // Movement state
+    this.moveForward = false;
+    this.moveBackward = false;
+    this.moveLeft = false;
+    this.moveRight = false;
+    this.moveUp = false;
+    this.moveDown = false;
 
-    this.speed = 2000;         // speed 
-    this.rotationSpeed = 1.2;  // rotationspeed
+    // Rotation state
+    this.rotateLeft = false;
+    this.rotateRight = false;
+    this.rotateUp = false;
+    this.rotateDown = false;
 
-    // load model
+    this.speed = 2000;
+    this.rotationSpeed = 1.2;
+
     this.shipObject = null;
     this.loadShipModel();
 
-    // keyboard binding
-    this._onKeyDown = this.onKeyDown.bind(this);
-    this._onKeyUp   = this.onKeyUp.bind(this);
-    document.addEventListener("keydown", this._onKeyDown);
-    document.addEventListener("keyup", this._onKeyUp);
+    // Bind and register input
+    this.onKeyDown = this.onKeyDown.bind(this);
+    this.onKeyUp = this.onKeyUp.bind(this);
+    document.addEventListener('keydown', this.onKeyDown);
+    document.addEventListener('keyup', this.onKeyUp);
   }
 
   loadShipModel() {
     const objLoader = new OBJLoader();
     const mtlLoader = new MTLLoader();
-    const modelPath = "/source/Raket.obj";    
-    const materialPath = "/source/Raket.mtl"; 
+    const modelPath = "/source/Raket.obj";
+    const materialPath = "/source/Raket.mtl";
 
-    console.log("Start loading model...");
     mtlLoader.load(
       materialPath,
       (materials) => {
-        console.log("Material loaded successfully, loading model...");
         materials.preload();
         objLoader.setMaterials(materials);
         objLoader.load(
           modelPath,
           (object) => {
-            console.log("Model loaded successfully");
             this.setupShipObject(object);
           },
           (xhr) => {
@@ -71,38 +66,21 @@ class Spaceship {
           },
           (error) => {
             console.error("Error loading spaceship model:", error);
-            this.createDefaultShip();
           }
         );
       },
       undefined,
       (error) => {
-        this.createDefaultShip();
+        console.error("Error loading materials:", error);
       }
     );
-  }
-
-  createDefaultShip() {
-    const geometry = new THREE.ConeGeometry(20, 60, 5);
-    geometry.rotateX(Math.PI / 2);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x888888,
-      metalness: 0.8,
-      roughness: 0.2,
-    });
-    const shipMesh = new THREE.Mesh(geometry, material);
-    const shipLight = new THREE.PointLight(0x3366ff, 1, 100);
-    shipLight.position.set(0, 0, -30);
-    shipMesh.add(shipLight);
-    const group = new THREE.Group();
-    group.add(shipMesh);
-    this.setupShipObject(group);
   }
 
   setupShipObject(object) {
     this.shipObject = object;
     this.shipObject.scale.set(10, 10, 10);
     this.shipObject.rotation.y = Math.PI;
+
     this.shipObject.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
@@ -112,101 +90,67 @@ class Spaceship {
     });
 
     this.shipGroup.add(this.shipObject);
-    // Initial position of the spacecraft
     this.shipGroup.position.set(0, 0, 20000);
-    console.log("SpaceShip model initialization completed");
+    console.log("Spaceship initialized");
   }
 
-  onKeyDown(e) {
-    switch(e.code) {
-      case "KeyW": this.controls.moveForward = true; break;
-      case "KeyS": this.controls.moveBackward = true; break;
-      case "KeyA": this.controls.moveLeft = true; break;
-      case "KeyD": this.controls.moveRight = true; break;
-      case "KeyQ": this.controls.moveUp = true; break;
-      case "KeyE": this.controls.moveDown = true; break;
-      case "KeyI": this.controls.rotateUp = true; break;
-      case "KeyK": this.controls.rotateDown = true; break;
-      case "KeyJ": this.controls.rotateLeft = true; break;
-      case "KeyL": this.controls.rotateRight = true; break;
+  onKeyDown(event) {
+    switch (event.code) {
+      case 'KeyW': this.moveForward = true; break;
+      case 'KeyS': this.moveBackward = true; break;
+      case 'KeyA': this.moveLeft = true; break;
+      case 'KeyD': this.moveRight = true; break;
+      case 'KeyQ': this.moveUp = true; break;
+      case 'KeyE': this.moveDown = true; break;
+      case 'KeyJ': this.rotateLeft = true; break;
+      case 'KeyL': this.rotateRight = true; break;
+      case 'KeyI': this.rotateUp = true; break;
+      case 'KeyK': this.rotateDown = true; break;
     }
   }
 
-  onKeyUp(e) {
-    switch(e.code) {
-      case "KeyW": this.controls.moveForward = false; break;
-      case "KeyS": this.controls.moveBackward = false; break;
-      case "KeyA": this.controls.moveLeft = false; break;
-      case "KeyD": this.controls.moveRight = false; break;
-      case "KeyQ": this.controls.moveUp = false; break;
-      case "KeyE": this.controls.moveDown = false; break;
-      case "KeyI": this.controls.rotateUp = false; break;
-      case "KeyK": this.controls.rotateDown = false; break;
-      case "KeyJ": this.controls.rotateLeft = false; break;
-      case "KeyL": this.controls.rotateRight = false; break;
-
-      case "ShiftLeft":
-      case "ShiftRight":
-        this.controls.warp = false;
-        break;
+  onKeyUp(event) {
+    switch (event.code) {
+      case 'KeyW': this.moveForward = false; break;
+      case 'KeyS': this.moveBackward = false; break;
+      case 'KeyA': this.moveLeft = false; break;
+      case 'KeyD': this.moveRight = false; break;
+      case 'KeyQ': this.moveUp = false; break;
+      case 'KeyE': this.moveDown = false; break;
+      case 'KeyJ': this.rotateLeft = false; break;
+      case 'KeyL': this.rotateRight = false; break;
+      case 'KeyI': this.rotateUp = false; break;
+      case 'KeyK': this.rotateDown = false; break;
     }
   }
 
   update(delta) {
     if (!this.shipObject) return;
 
-    this.updateRotation(delta);
-    this.updateMovement(delta);
-    this.updateCamera();
-  }
+    const rotSpeed = this.rotationSpeed * delta;
 
-  updateRotation(delta) {
-    if (this.controls.rotateUp) {
-      this.shipGroup.rotateX(-this.rotationSpeed * delta);
-    }
-    if (this.controls.rotateDown) {
-      this.shipGroup.rotateX(this.rotationSpeed * delta);
-    }
-    if (this.controls.rotateLeft) {
-      this.shipGroup.rotateY(this.rotationSpeed * delta);
-    }
-    if (this.controls.rotateRight) {
-      this.shipGroup.rotateY(-this.rotationSpeed * delta);
-    }
-  }
+    // Apply rotation
+    if (this.rotateLeft) this.shipGroup.rotateY(rotSpeed);
+    if (this.rotateRight) this.shipGroup.rotateY(-rotSpeed);
+    if (this.rotateUp) this.shipGroup.rotateX(-rotSpeed);
+    if (this.rotateDown) this.shipGroup.rotateX(rotSpeed);
 
-  updateMovement(delta) {
-    const speed = this.speed * delta;
-    const velocity = new THREE.Vector3(0, 0, 0);
+    // Direction vectors
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.shipGroup.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.shipGroup.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.shipGroup.quaternion);
 
-    const forwardVec = new THREE.Vector3(0, 0, -1).applyQuaternion(this.shipGroup.quaternion);
-    const rightVec = new THREE.Vector3(1, 0, 0).applyQuaternion(this.shipGroup.quaternion);
-    const upVec = new THREE.Vector3(0, 1, 0).applyQuaternion(this.shipGroup.quaternion);
+    const moveSpeed = this.speed * delta;
 
-    if (this.controls.moveForward) {
-      velocity.add(forwardVec.multiplyScalar(speed));
-    }
-    if (this.controls.moveBackward) {
-      const backVec = new THREE.Vector3(0, 0, 1).applyQuaternion(this.shipGroup.quaternion);
-      velocity.add(backVec.multiplyScalar(speed));
-    }
-    if (this.controls.moveLeft) {
-      velocity.add(rightVec.clone().multiplyScalar(-speed));
-    }
-    if (this.controls.moveRight) {
-      velocity.add(rightVec.multiplyScalar(speed));
-    }
-    if (this.controls.moveUp) {
-      velocity.add(upVec.multiplyScalar(speed));
-    }
-    if (this.controls.moveDown) {
-      velocity.add(upVec.clone().multiplyScalar(-speed));
-    }
+    // Apply movement
+    if (this.moveForward) this.shipGroup.position.addScaledVector(forward, moveSpeed);
+    if (this.moveBackward) this.shipGroup.position.addScaledVector(forward, -moveSpeed);
+    if (this.moveLeft) this.shipGroup.position.addScaledVector(right, -moveSpeed);
+    if (this.moveRight) this.shipGroup.position.addScaledVector(right, moveSpeed);
+    if (this.moveUp) this.shipGroup.position.addScaledVector(up, moveSpeed);
+    if (this.moveDown) this.shipGroup.position.addScaledVector(up, -moveSpeed);
 
-    this.shipGroup.position.add(velocity);
-  }
-
-  updateCamera() {
+    // Camera follow behind the ship
     const offset = new THREE.Vector3(0, 300, 800);
     const worldOffset = offset.clone().applyQuaternion(this.shipGroup.quaternion);
     const desiredPos = this.shipGroup.position.clone().add(worldOffset);
@@ -221,8 +165,8 @@ class Spaceship {
   }
 
   dispose() {
-    document.removeEventListener("keydown", this._onKeyDown);
-    document.removeEventListener("keyup", this._onKeyUp);
+    document.removeEventListener("keydown", this.onKeyDown);
+    document.removeEventListener("keyup", this.onKeyUp);
   }
 }
 
